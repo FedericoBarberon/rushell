@@ -1,7 +1,10 @@
 #[allow(unused_imports)]
 use std::io::{self, Write};
 
-use codecrafters_shell::parser::ParsedInput;
+use codecrafters_shell::{
+    executor::{ExecutionResult, execute},
+    parser::ParsedInput,
+};
 
 fn main() {
     loop {
@@ -15,11 +18,9 @@ fn main() {
 
         let parsed_input = ParsedInput::parse(&input);
 
-        match parsed_input.command.as_str() {
-            "exit" => break,
-            "echo" => println!("{}", parsed_input.args.join(" ")),
-            "" => continue,
-            _ => println!("{}: command not found", &parsed_input.command),
+        match execute(parsed_input) {
+            ExecutionResult::Continue => continue,
+            ExecutionResult::Exit => break,
         }
     }
 }
