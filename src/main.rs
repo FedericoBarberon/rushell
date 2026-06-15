@@ -2,15 +2,16 @@
 use std::io::{self, Write};
 
 fn main() {
-    // TODO: Uncomment the code below to pass the first stage
-    print!("$ ");
-    io::stdout().flush().unwrap();
+    loop {
+        print!("$ ");
+        io::stdout().flush().unwrap();
 
-    let mut input = String::new();
-    io::stdin()
-        .read_line(&mut input)
-        .expect("Failed to read stdin");
+        let mut input = String::new();
+        io::stdin()
+            .read_line(&mut input)
+            .expect("Failed to read stdin");
 
-    let input = input.trim();
-    println!("{input}: command not found");
+        let input = input.trim();
+        println!("{input}: command not found");
+    }
 }
