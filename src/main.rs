@@ -12,6 +12,11 @@ fn main() {
             .expect("Failed to read stdin");
 
         let input = input.trim();
+
+        if input == "exit" {
+            break;
+        }
+
         println!("{input}: command not found");
     }
 }
