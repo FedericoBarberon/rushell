@@ -1,6 +1,8 @@
 #[allow(unused_imports)]
 use std::io::{self, Write};
 
+use codecrafters_shell::parser::ParsedInput;
+
 fn main() {
     loop {
         print!("$ ");
@@ -11,19 +13,13 @@ fn main() {
             .read_line(&mut input)
             .expect("Failed to read stdin");
 
-        let input = input.trim();
-        let mut tokens = input.split_whitespace();
+        let parsed_input = ParsedInput::parse(&input);
 
-        let Some(command) = tokens.next() else {
-            continue;
-        };
-
-        let args = tokens.collect::<Vec<&str>>();
-
-        match command {
+        match parsed_input.command.as_str() {
             "exit" => break,
-            "echo" => println!("{}", args.join(" ")),
-            _ => println!("{input}: command not found"),
+            "echo" => println!("{}", parsed_input.args.join(" ")),
+            "" => continue,
+            _ => println!("{}: command not found", &parsed_input.command),
         }
     }
 }
