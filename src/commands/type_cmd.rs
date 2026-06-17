@@ -3,6 +3,7 @@ use std::io::{Read, Write};
 use crate::{
     commands::Command,
     execution::{Executable, ExecutionResult},
+    finder::find_executable_in_path,
     parser::ParsedInput,
 };
 
@@ -30,9 +31,11 @@ impl Executable for TypeCmd {
 
         for cmd in &self.args {
             if Command::try_from(ParsedInput::from(cmd.as_str())).is_ok() {
-                let _ = writeln!(output, "{} is a shell builtin", cmd);
+                let _ = writeln!(output, "{cmd} is a shell builtin");
+            } else if let Some(path) = find_executable_in_path(cmd) {
+                let _ = writeln!(output, "{cmd} is {}", path.to_string_lossy());
             } else {
-                let _ = writeln!(output, "{}: not found", cmd);
+                let _ = writeln!(output, "{cmd}: not found");
             }
         }
 
@@ -40,6 +43,11 @@ impl Executable for TypeCmd {
     }
 }
 
+/*
+ * There are no tests for external commands because i already test the core function that do the logic
+ * of finding the executable (find_executable(name: &str, paths: &[&Path])). The only thing that is not tested
+ * is the conversion from the PATH env var to &[&Path], which I think its not worth it.
+ */
 #[cfg(test)]
 mod tests {
     use crate::{
