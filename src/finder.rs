@@ -3,6 +3,10 @@ use std::path::{Path, PathBuf};
 use std::{env, fs};
 
 pub fn find_executable(name: &str, paths: &[&Path]) -> Option<PathBuf> {
+    if name.is_empty() {
+        return None;
+    }
+
     for path in paths {
         let file_path = path.join(name);
 
@@ -32,7 +36,7 @@ fn is_executable(path: &Path) -> std::io::Result<bool> {
 
 #[cfg(test)]
 mod tests {
-    use std::{fs, os::unix::fs::PermissionsExt};
+    use crate::tests::utilities::{create_executable, create_file};
 
     use super::*;
     use tempfile::tempdir;
@@ -40,11 +44,8 @@ mod tests {
     #[test]
     fn single_path_with_executable() {
         let name = "my_file";
-
         let dir = tempdir().unwrap();
-        let file = dir.path().join(name);
-        let _ = fs::write(file.as_path(), "");
-        fs::set_permissions(&file, fs::Permissions::from_mode(0o755)).unwrap();
+        let file = create_executable(name, "", dir.path());
 
         assert_eq!(find_executable(name, &[&dir.path()]), Some(file));
     }
@@ -52,7 +53,6 @@ mod tests {
     #[test]
     fn single_path_without_file() {
         let name = "my_file";
-
         let dir = tempdir().unwrap();
 
         assert!(find_executable(name, &[&dir.path()]).is_none());
@@ -61,10 +61,8 @@ mod tests {
     #[test]
     fn single_path_with_file_no_executable() {
         let name = "my_file";
-
         let dir = tempdir().unwrap();
-        let file = dir.path().join(name);
-        let _ = fs::write(file.as_path(), "");
+        create_file(name, "", dir.path());
 
         assert!(find_executable(name, &[&dir.path()]).is_none());
     }
@@ -75,9 +73,7 @@ mod tests {
 
         let dirs: [tempfile::TempDir; 3] = std::array::from_fn(|_| tempdir().unwrap());
 
-        let file = dirs[1].path().join(name);
-        let _ = fs::write(file.as_path(), "");
-        fs::set_permissions(&file, fs::Permissions::from_mode(0o755)).unwrap();
+        let file = create_executable(name, "", dirs[1].path());
 
         let paths = dirs.iter().map(|dir| dir.path()).collect::<Vec<&Path>>();
 
@@ -90,13 +86,8 @@ mod tests {
 
         let dirs: [tempfile::TempDir; 3] = std::array::from_fn(|_| tempdir().unwrap());
 
-        let file1 = dirs[1].path().join(name);
-        let _ = fs::write(file1.as_path(), "");
-        fs::set_permissions(&file1, fs::Permissions::from_mode(0o755)).unwrap();
-
-        let file2 = dirs[2].path().join(name);
-        let _ = fs::write(file2.as_path(), "");
-        fs::set_permissions(&file2, fs::Permissions::from_mode(0o755)).unwrap();
+        let file1 = create_executable(name, "", dirs[1].path());
+        create_executable(name, "", dirs[2].path());
 
         let paths = dirs.iter().map(|dir| dir.path()).collect::<Vec<&Path>>();
 
@@ -119,15 +110,22 @@ mod tests {
 
         let dirs: [tempfile::TempDir; 3] = std::array::from_fn(|_| tempdir().unwrap());
 
-        let file1 = dirs[1].path().join(name);
-        let _ = fs::write(file1.as_path(), "");
-
-        let file2 = dirs[2].path().join(name);
-        let _ = fs::write(file2.as_path(), "");
-        fs::set_permissions(&file2, fs::Permissions::from_mode(0o755)).unwrap();
+        create_file(name, "", dirs[1].path());
+        let file2 = create_executable(name, "", dirs[2].path());
 
         let paths = dirs.iter().map(|dir| dir.path()).collect::<Vec<&Path>>();
 
         assert_eq!(find_executable(name, &paths), Some(file2));
+    }
+
+    #[test]
+    fn empty_name_does_not_match_when_path_entry_is_a_file() {
+        let name = "bash";
+        let dir = tempdir().unwrap();
+        let file = create_executable(name, "", dir.path());
+
+        // "bash" es un path-entry inválido (debería ser un dir), pero si existe
+        // y es ejecutable, name="" no debe matchearlo
+        assert!(find_executable("", &[&file]).is_none());
     }
 }

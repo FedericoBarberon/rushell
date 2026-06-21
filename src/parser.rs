@@ -30,6 +30,8 @@ impl From<String> for ParsedInput {
 
 #[cfg(test)]
 mod tests {
+    use crate::tests::utilities::build_args;
+
     use super::*;
 
     #[test]
@@ -58,12 +60,7 @@ mod tests {
     }
 
     fn test_eq(input: &str, cmd: &str, args: &[&str]) {
-        let expected = ParsedInput::new(
-            cmd.to_owned(),
-            args.into_iter()
-                .map(|&s| s.to_owned())
-                .collect::<Vec<String>>(),
-        );
+        let expected = ParsedInput::new(cmd.to_owned(), build_args(args));
 
         assert_eq!(ParsedInput::from(input), expected);
     }

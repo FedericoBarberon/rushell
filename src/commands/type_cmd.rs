@@ -3,18 +3,17 @@ use std::io::{Read, Write};
 use crate::{
     commands::Command,
     execution::{Executable, ExecutionResult},
-    finder::find_executable_in_path,
     parser::ParsedInput,
 };
 
 #[derive(Debug, PartialEq)]
 pub struct TypeCmd {
-    args: Vec<String>,
+    commands: Vec<String>,
 }
 
 impl TypeCmd {
-    pub fn new(args: Vec<String>) -> Self {
-        Self { args }
+    pub fn new(commands: Vec<String>) -> Self {
+        Self { commands }
     }
 }
 
@@ -25,17 +24,21 @@ impl Executable for TypeCmd {
         output: &mut impl Write,
         _error: &mut impl Write,
     ) -> ExecutionResult {
-        if self.args.is_empty() {
+        if self.commands.is_empty() {
             return ExecutionResult::Continue;
         }
 
-        for cmd in &self.args {
-            if Command::try_from(ParsedInput::from(cmd.as_str())).is_ok() {
-                let _ = writeln!(output, "{cmd} is a shell builtin");
-            } else if let Some(path) = find_executable_in_path(cmd) {
-                let _ = writeln!(output, "{cmd} is {}", path.to_string_lossy());
-            } else {
-                let _ = writeln!(output, "{cmd}: not found");
+        for cmd in &self.commands {
+            match Command::try_from(ParsedInput::from(cmd.as_str())) {
+                Ok(Command::External(ext)) => {
+                    let _ = writeln!(output, "{cmd} is {}", ext.path().to_string_lossy());
+                }
+                Ok(_) => {
+                    let _ = writeln!(output, "{cmd} is a shell builtin");
+                }
+                Err(_) => {
+                    let _ = writeln!(output, "{cmd}: not found");
+                }
             }
         }
 
@@ -43,17 +46,14 @@ impl Executable for TypeCmd {
     }
 }
 
-/*
- * There are no tests for external commands because i already test the core function that do the logic
- * of finding the executable (find_executable(name: &str, paths: &[&Path])). The only thing that is not tested
- * is the conversion from the PATH env var to &[&Path], which I think its not worth it.
- */
 #[cfg(test)]
 mod tests {
     use crate::{
         execution::ExecutionResult,
-        tests::utilities::{TestBuffers, build_args},
+        tests::utilities::{EnvPathGuard, TestBuffers, build_args, create_executable},
     };
+    use serial_test::serial;
+    use tempfile::tempdir;
 
     use super::*;
 
@@ -96,6 +96,36 @@ mod tests {
         assert_eq!(
             String::from_utf8(output).unwrap(),
             "echo is a shell builtin\n"
+        );
+        assert!(input.get_ref().is_empty());
+        assert!(error.is_empty());
+    }
+
+    #[test]
+    #[serial]
+    fn external_cmd() {
+        let name = "my_command";
+        let dir = tempdir().unwrap();
+        let file = create_executable(name, "", dir.path());
+
+        // SAFETY: the test has #[serial] macro
+        let _guard = EnvPathGuard::prepend(dir.path());
+
+        let TestBuffers {
+            mut input,
+            mut output,
+            mut error,
+        } = TestBuffers::new(None);
+        let type_cmd = TypeCmd::new(build_args(&[name]));
+
+        assert_eq!(
+            type_cmd.execute(&mut input, &mut output, &mut error),
+            ExecutionResult::Continue
+        );
+
+        assert_eq!(
+            String::from_utf8(output).unwrap(),
+            format!("{name} is {}\n", file.to_string_lossy())
         );
         assert!(input.get_ref().is_empty());
         assert!(error.is_empty());

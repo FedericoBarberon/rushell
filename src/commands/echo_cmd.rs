@@ -34,7 +34,7 @@ mod tests {
     };
 
     #[test]
-    fn write_to_output() {
+    fn execution_writes_to_output() {
         let TestBuffers {
             mut input,
             mut output,
@@ -53,7 +53,7 @@ mod tests {
     }
 
     #[test]
-    fn no_args() {
+    fn execution_with_no_args() {
         let TestBuffers {
             mut input,
             mut output,
