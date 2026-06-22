@@ -82,7 +82,7 @@ mod tests {
     }
 
     #[test]
-    fn execute_retursn_exit_result() {
+    fn execute_returns_exit_result() {
         let TestBuffers {
             mut input,
             mut output,

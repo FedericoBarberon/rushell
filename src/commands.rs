@@ -2,7 +2,8 @@ use std::io::{Read, Write};
 
 use crate::{
     commands::{
-        echo_cmd::EchoCmd, exit_cmd::ExitCmd, external_cmd::ExternalCmd, type_cmd::TypeCmd,
+        echo_cmd::EchoCmd, exit_cmd::ExitCmd, external_cmd::ExternalCmd, pwd_cmd::PwdCmd,
+        type_cmd::TypeCmd,
     },
     execution::Executable,
     finder::find_executable_in_path,
@@ -12,6 +13,7 @@ use crate::{
 mod echo_cmd;
 mod exit_cmd;
 mod external_cmd;
+mod pwd_cmd;
 mod type_cmd;
 
 #[derive(Debug, PartialEq)]
@@ -19,6 +21,7 @@ pub enum Command {
     Exit(ExitCmd),
     Echo(EchoCmd),
     Type(TypeCmd),
+    Pwd(PwdCmd),
     External(ExternalCmd),
 }
 
@@ -33,6 +36,7 @@ impl Executable for Command {
             Command::Exit(cmd) => cmd.execute(input, output, error),
             Command::Echo(cmd) => cmd.execute(input, output, error),
             Command::Type(cmd) => cmd.execute(input, output, error),
+            Command::Pwd(cmd) => cmd.execute(input, output, error),
             Command::External(cmd) => cmd.execute(input, output, error),
         }
     }
@@ -68,6 +72,7 @@ impl TryFrom<ParsedInput> for Command {
             }
             "echo" => Ok(Command::Echo(EchoCmd::new(value.args))),
             "type" => Ok(Command::Type(TypeCmd::new(value.args))),
+            "pwd" => Ok(Command::Pwd(PwdCmd::new())),
             _ => {
                 if let Some(path) = find_executable_in_path(&value.command) {
                     Ok(Command::External(ExternalCmd::new(
@@ -124,6 +129,14 @@ mod tests {
     fn type_cmd_from_parsed_input() {
         let parsed_input = ParsedInput::from("type echo ls");
         let expected = Command::Type(TypeCmd::new(build_args(&["echo", "ls"])));
+
+        assert_eq!(Command::try_from(parsed_input).unwrap(), expected);
+    }
+
+    #[test]
+    fn pwd_cmd_from_parsed_input() {
+        let parsed_input = ParsedInput::from("pwd");
+        let expected = Command::Pwd(PwdCmd::new());
 
         assert_eq!(Command::try_from(parsed_input).unwrap(), expected);
     }
