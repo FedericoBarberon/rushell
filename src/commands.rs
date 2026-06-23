@@ -2,14 +2,15 @@ use std::io::{Read, Write};
 
 use crate::{
     commands::{
-        echo_cmd::EchoCmd, exit_cmd::ExitCmd, external_cmd::ExternalCmd, pwd_cmd::PwdCmd,
-        type_cmd::TypeCmd,
+        cd_cmd::CdCmd, echo_cmd::EchoCmd, exit_cmd::ExitCmd, external_cmd::ExternalCmd,
+        pwd_cmd::PwdCmd, type_cmd::TypeCmd,
     },
     execution::Executable,
     finder::find_executable_in_path,
     parser::ParsedInput,
 };
 
+mod cd_cmd;
 mod echo_cmd;
 mod exit_cmd;
 mod external_cmd;
@@ -22,6 +23,7 @@ pub enum Command {
     Echo(EchoCmd),
     Type(TypeCmd),
     Pwd(PwdCmd),
+    Cd(CdCmd),
     External(ExternalCmd),
 }
 
@@ -37,6 +39,7 @@ impl Executable for Command {
             Command::Echo(cmd) => cmd.execute(input, output, error),
             Command::Type(cmd) => cmd.execute(input, output, error),
             Command::Pwd(cmd) => cmd.execute(input, output, error),
+            Command::Cd(cmd) => cmd.execute(input, output, error),
             Command::External(cmd) => cmd.execute(input, output, error),
         }
     }
@@ -72,7 +75,16 @@ impl TryFrom<ParsedInput> for Command {
             }
             "echo" => Ok(Command::Echo(EchoCmd::new(value.args))),
             "type" => Ok(Command::Type(TypeCmd::new(value.args))),
-            "pwd" => Ok(Command::Pwd(PwdCmd::new())),
+            "pwd" => {
+                let cmd =
+                    PwdCmd::try_from(value.args).map_err(|e| CommandParseError::InvalidArgs(e))?;
+                Ok(Command::Pwd(cmd))
+            }
+            "cd" => {
+                let cmd =
+                    CdCmd::try_from(value.args).map_err(|e| CommandParseError::InvalidArgs(e))?;
+                Ok(Command::Cd(cmd))
+            }
             _ => {
                 if let Some(path) = find_executable_in_path(&value.command) {
                     Ok(Command::External(ExternalCmd::new(
@@ -90,6 +102,8 @@ impl TryFrom<ParsedInput> for Command {
 
 #[cfg(test)]
 mod tests {
+    use std::path::PathBuf;
+
     use serial_test::serial;
     use tempfile::tempdir;
 
@@ -139,6 +153,30 @@ mod tests {
         let expected = Command::Pwd(PwdCmd::new());
 
         assert_eq!(Command::try_from(parsed_input).unwrap(), expected);
+    }
+
+    #[test]
+    fn pwd_cmd_too_many_args_from_parsed_input() {
+        let parsed_input = ParsedInput::from("pwd foo");
+        let expected_err = CommandParseError::InvalidArgs(InvalidArgsError::TooManyArgs);
+
+        assert_eq!(Command::try_from(parsed_input).unwrap_err(), expected_err);
+    }
+
+    #[test]
+    fn cd_cmd_from_parsed_input() {
+        let parsed_input = ParsedInput::from("cd path");
+        let expected = Command::Cd(CdCmd::new(PathBuf::from("path")));
+
+        assert_eq!(Command::try_from(parsed_input).unwrap(), expected);
+    }
+
+    #[test]
+    fn cd_cmd_too_many_args_from_parsed_input() {
+        let parsed_input = ParsedInput::from("cd foo bar");
+        let expected_err = CommandParseError::InvalidArgs(InvalidArgsError::TooManyArgs);
+
+        assert_eq!(Command::try_from(parsed_input).unwrap_err(), expected_err);
     }
 
     #[test]
