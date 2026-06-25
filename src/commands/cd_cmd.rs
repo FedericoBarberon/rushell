@@ -103,7 +103,7 @@ mod tests {
     }
 
     #[test]
-    fn execute_with_valid_path_changes_cwd() {
+    fn execute_with_absolute_path() {
         let TestBuffers {
             mut input,
             mut output,
@@ -123,6 +123,120 @@ mod tests {
         let new_cwd = env::current_dir().unwrap();
 
         assert_eq!(new_cwd, path);
+
+        assert!(output.is_empty());
+        assert!(input.get_ref().is_empty());
+        assert!(error.is_empty());
+    }
+
+    #[test]
+    fn execute_with_relative_current_path() {
+        let TestBuffers {
+            mut input,
+            mut output,
+            mut error,
+        } = TestBuffers::new(None);
+
+        let guard = CwdGuard::capture();
+
+        let path = PathBuf::from("./");
+        let cmd = CdCmd::new(path.clone());
+
+        assert_eq!(
+            cmd.execute(&mut input, &mut output, &mut error),
+            ExecutionResult::Continue
+        );
+
+        let new_cwd = env::current_dir().unwrap();
+
+        assert_eq!(new_cwd, guard.original);
+
+        assert!(output.is_empty());
+        assert!(input.get_ref().is_empty());
+        assert!(error.is_empty());
+    }
+
+    #[test]
+    fn execute_with_relative_parent_path() {
+        let TestBuffers {
+            mut input,
+            mut output,
+            mut error,
+        } = TestBuffers::new(None);
+
+        let _guard = CwdGuard::capture();
+
+        env::set_current_dir("/home").unwrap();
+
+        let path = PathBuf::from("../");
+        let cmd = CdCmd::new(path.clone());
+
+        assert_eq!(
+            cmd.execute(&mut input, &mut output, &mut error),
+            ExecutionResult::Continue
+        );
+
+        let new_cwd = env::current_dir().unwrap();
+
+        assert_eq!(new_cwd, PathBuf::from("/"));
+
+        assert!(output.is_empty());
+        assert!(input.get_ref().is_empty());
+        assert!(error.is_empty());
+    }
+
+    #[test]
+    fn execute_with_relative_current_path_shorthand() {
+        let TestBuffers {
+            mut input,
+            mut output,
+            mut error,
+        } = TestBuffers::new(None);
+
+        let _guard = CwdGuard::capture();
+
+        env::set_current_dir("/").unwrap();
+
+        let path = PathBuf::from("home");
+        let cmd = CdCmd::new(path.clone());
+
+        assert_eq!(
+            cmd.execute(&mut input, &mut output, &mut error),
+            ExecutionResult::Continue
+        );
+
+        let new_cwd = env::current_dir().unwrap();
+
+        assert_eq!(new_cwd, PathBuf::from("/home"));
+
+        assert!(output.is_empty());
+        assert!(input.get_ref().is_empty());
+        assert!(error.is_empty());
+    }
+
+    #[test]
+    fn execute_with_relative_path() {
+        let TestBuffers {
+            mut input,
+            mut output,
+            mut error,
+        } = TestBuffers::new(None);
+
+        let _guard = CwdGuard::capture();
+
+        env::set_current_dir("/").unwrap();
+
+        let path = PathBuf::from("./home/..");
+        let cmd = CdCmd::new(path.clone());
+
+        assert_eq!(
+            cmd.execute(&mut input, &mut output, &mut error),
+            ExecutionResult::Continue
+        );
+
+        let new_cwd = env::current_dir().unwrap();
+
+        assert_eq!(new_cwd, PathBuf::from("/"));
 
         assert!(output.is_empty());
         assert!(input.get_ref().is_empty());
