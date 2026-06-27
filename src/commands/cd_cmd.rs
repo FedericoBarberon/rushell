@@ -11,7 +11,16 @@ pub struct CdCmd {
 }
 
 impl CdCmd {
-    pub fn new(path: PathBuf) -> Self {
+    pub fn new(mut path: PathBuf) -> Self {
+        if path.starts_with("~")
+            && let Some(home_dir) = env::home_dir()
+        {
+            path = path
+                .to_string_lossy()
+                .replacen("~", &home_dir.to_string_lossy(), 1)
+                .into();
+        }
+
         Self { path }
     }
 }
@@ -59,7 +68,7 @@ impl TryFrom<Vec<String>> for CdCmd {
 
 #[cfg(test)]
 mod tests {
-    use std::env;
+    use std::{env, fs};
 
     use crate::{
         execution::ExecutionResult,
@@ -67,6 +76,24 @@ mod tests {
     };
 
     use super::*;
+
+    struct TmpDirGuard {
+        path: PathBuf,
+    }
+
+    impl TmpDirGuard {
+        fn create(path: PathBuf) -> std::io::Result<Self> {
+            fs::create_dir_all(&path)?;
+
+            Ok(Self { path })
+        }
+    }
+
+    impl Drop for TmpDirGuard {
+        fn drop(&mut self) {
+            let _ = fs::remove_dir_all(&self.path);
+        }
+    }
 
     struct CwdGuard {
         original: PathBuf,
@@ -237,6 +264,67 @@ mod tests {
         let new_cwd = env::current_dir().unwrap();
 
         assert_eq!(new_cwd, PathBuf::from("/"));
+
+        assert!(output.is_empty());
+        assert!(input.get_ref().is_empty());
+        assert!(error.is_empty());
+    }
+
+    #[test]
+    fn execute_with_home_alias() {
+        let TestBuffers {
+            mut input,
+            mut output,
+            mut error,
+        } = TestBuffers::new(None);
+
+        let _guard = CwdGuard::capture();
+
+        let path = PathBuf::from("~");
+        let cmd = CdCmd::new(path.clone());
+
+        assert_eq!(
+            cmd.execute(&mut input, &mut output, &mut error),
+            ExecutionResult::Continue
+        );
+
+        let new_cwd = env::current_dir().unwrap();
+        let home_dir = env::home_dir().unwrap();
+
+        assert_eq!(new_cwd, home_dir);
+
+        assert!(output.is_empty());
+        assert!(input.get_ref().is_empty());
+        assert!(error.is_empty());
+    }
+
+    #[test]
+    fn execute_with_home_alias_with_extra_path() {
+        let TestBuffers {
+            mut input,
+            mut output,
+            mut error,
+        } = TestBuffers::new(None);
+
+        let _cwd_guard = CwdGuard::capture();
+
+        let home_dir = env::home_dir().unwrap();
+        let mut tmp_dir = home_dir.clone();
+        tmp_dir.push("rushell_test_tmp_dir");
+
+        let _tmp_guard = TmpDirGuard::create(tmp_dir.clone()).unwrap();
+
+        let path = PathBuf::from("~/rushell_test_tmp_dir");
+        let cmd = CdCmd::new(path.clone());
+
+        assert_eq!(
+            cmd.execute(&mut input, &mut output, &mut error),
+            ExecutionResult::Continue
+        );
+
+        let new_cwd = env::current_dir().unwrap();
+
+        assert_eq!(new_cwd, tmp_dir);
 
         assert!(output.is_empty());
         assert!(input.get_ref().is_empty());
